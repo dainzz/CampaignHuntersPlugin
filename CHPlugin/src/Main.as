@@ -129,6 +129,7 @@ void UpdateRecords() {
 			record["Time"] = player.BestTime;
 			record["Map"] = map;
 			record["Player"] = playerObj;
+			record["TimeLeft"] = timeLeft;
 			
 		 
 		 string data = Json::Write(record);
