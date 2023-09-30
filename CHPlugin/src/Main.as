@@ -28,7 +28,8 @@ bool g_mlfeedDetected = true;
 bool g_mlfeedDetected = false;
 #endif
  
- 
+dictionary g_addedTimes;
+
 uint lastPbUpdate = 0;
  
 void MainLoop() {
@@ -38,16 +39,19 @@ void MainLoop() {
     while (PermissionsOkay) {
         yield();
         if (PlaygroundNotNullAndEditorNull) {
-            
+		
+		
             lastPbUpdate = Time::Now; // set this here to avoid triggering immediately
-            while (PlaygroundNotNullAndEditorNull && S_ShowWindow) {
+            while (PlaygroundNotNullAndEditorNull) {
                 yield();
-                if (lastPbUpdate + 5000 < Time::Now) {                    
+                if (lastPbUpdate + 1000 < Time::Now) {                    
                     startnew(UpdateRecords);
                     lastPbUpdate = Time::Now; // bc we start it in a coro; don't want to run twice
                 }
             }
-            g_addedTimes.deleteAll();
+			
+            g_addedTimes.DeleteAll();
+			timeLeft = -1;
         }
         // wait while playground is null or we aren't showing the window
         while (!PlaygroundNotNullAndEditorNull) yield();
@@ -64,12 +68,6 @@ bool SoloModeExitCheck() {
 }
  
  
-
-bool get_PlaygroundNotNullAndEditorNull() {
-    return GetApp().CurrentPlayground !is null && GetApp().Editor is null;
-}
- 
- 
  
  
 void Update(float dt) {
@@ -82,8 +80,8 @@ void Update(float dt) {
 uint g_PlayersInServerLast = 0;
 bool g_CurrentlyLoadingRecords = false;
  
- 
-        dictionary g_addedTimes;
+string host = "http://dainzz-001-site1.htempurl.com";
+
  
 void UpdateRecords() {
  
@@ -105,13 +103,17 @@ void UpdateRecords() {
  
  
 	auto raceData = MLFeed::GetRaceData_V4();	
- 
-	auto timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
-	auto timestamp = Time::get_Stamp();
- 
-	//string host = "http://dainzz-001-site1.htempurl.com";
-	//string host = "http://192.168.178.75:7236";
-	string host = "http://localhost:5234";
+	
+	if(timeLeft = -1){
+		timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime
+		if(timeLeft < 600000){
+						Net::HttpRequest@ reqTime = Net::HttpGet(host + "/api/time/" + timeLeft);
+					while (!reqTime.Finished()) {
+					yield();
+					sleep(50);
+		}
+		else{timeLeft = -1};		
+	}
  
 	Json::Value jsonData = Json::Array();
  
@@ -175,17 +177,9 @@ void UpdateRecords() {
   }	 		
  
  
-	Net::HttpRequest@ reqTime = Net::HttpGet(host + "/api/time/" + timeLeft + "/" + timestamp);
-        while (!reqTime.Finished()) {
-            yield();
-            sleep(50);
-			}
- 
- 
- 
+	
  
   	g_CurrentyUpdating = false;
-
 }
 
 
@@ -213,7 +207,7 @@ void UpdateAllRecords() {
  
 	//string host = "http://dainzz-001-site1.htempurl.com";
 	//string host = "http://192.168.178.75:7236";
-	string host = "http://localhost:5234";
+	//string host = "http://localhost:5234";
  
 	Json::Value jsonData = Json::Array();
  
@@ -268,14 +262,11 @@ void UpdateAllRecords() {
  
   }	 		
  
- 
-	Net::HttpRequest@ reqTime = Net::HttpGet(host + "/api/time/" + timeLeft + "/" + timestamp);
+Net::HttpRequest@ reqTime = Net::HttpGet(host + "/api/time/" + timeLeft);
         while (!reqTime.Finished()) {
             yield();
             sleep(50);
 			}
- 
- 
  
  	g_CurrentyUpdating = false;
 
@@ -360,7 +351,7 @@ void Render() {
     }
 }
  
-     g_CurrentyUpdating = false;
+     bool g_CurrentyUpdating = false;
  
 void DrawUI() {
     if (!PermissionsOkay) return;
