@@ -81,9 +81,9 @@ bool SoloModeExitCheck() {
 
  
 void Update(float dt) {
-    if (g_mlfeedDetected && autoUpdate) {
+    if (g_mlfeedDetected) {
         if (PlaygroundNotNullAndEditorNull) {
-             if (lastPbUpdate + 1000 < Time::Now && !g_CurrentyUpdating) { 
+             if (autoUpdate && lastPbUpdate + 1000 < Time::Now && !g_CurrentyUpdating) { 
                  startnew(UpdateRecords);
                  lastPbUpdate = Time::Now; 
                  }
