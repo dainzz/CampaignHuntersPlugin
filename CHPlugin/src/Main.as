@@ -21,40 +21,49 @@ void NotifyMissingPermissions() {
         );
     warn("Missing permissions! D:\nYou probably don't have permission to view records/PBs.\nThis plugin won't do anything.");
 }
+
+
+dictionary g_addedTimes;
+
+uint lastPbUpdate = 0;
  
 #if DEPENDENCY_MLFEEDRACEDATA
 bool g_mlfeedDetected = true;
 #else
 bool g_mlfeedDetected = false;
 #endif
- 
-dictionary g_addedTimes;
 
-uint lastPbUpdate = 0;
- 
+
+
+
+
 void MainLoop() {
+    return;
     // when current playground becomes not-null, get records
     // when player count changes, get records
     // when playground goes null, reset
     while (PermissionsOkay) {
         yield();
         if (PlaygroundNotNullAndEditorNull) {
-		
-		
+            print("Entering Update loop");
             lastPbUpdate = Time::Now; // set this here to avoid triggering immediately
             while (PlaygroundNotNullAndEditorNull) {
                 yield();
-                if (lastPbUpdate + 1000 < Time::Now) {                    
+                if (lastPbUpdate + 1000 < Time::Now && !g_CurrentyUpdating) {               
                     startnew(UpdateRecords);
                     lastPbUpdate = Time::Now; // bc we start it in a coro; don't want to run twice
                 }
             }
 			
+			print("Clearing addedTimes");
             g_addedTimes.DeleteAll();
+			print(g_addedTimes.GetSize());
 			timeLeft = -1;
+			g_CurrentyUpdating = false;
         }
         // wait while playground is null or we aren't showing the window
         while (!PlaygroundNotNullAndEditorNull) yield();
+        print("Playground is not null again, new map loaded?");
     }
 }
  
@@ -68,13 +77,25 @@ bool SoloModeExitCheck() {
 }
  
  
- 
+     
+
  
 void Update(float dt) {
-    if (g_mlfeedDetected && !S_SkipMLFeedCheck && S_ShowWindow) {
-        // checking this every frame has minimal overhead; <0.1ms
-		
-    }
+    if (g_mlfeedDetected && autoUpdate) {
+        if (PlaygroundNotNullAndEditorNull) {
+             if (lastPbUpdate + 1000 < Time::Now && !g_CurrentyUpdating) { 
+                 startnew(UpdateRecords);
+                 lastPbUpdate = Time::Now; 
+                 }
+        }
+                    else{
+                g_addedTimes.DeleteAll();
+                timeLeft = -1;
+                print("Map Change, resetting data.");
+            }
+        }
+    if(!g_mlfeedDetected)
+        print("no MLFeed");
 }
  
 uint g_PlayersInServerLast = 0;
@@ -82,205 +103,103 @@ bool g_CurrentlyLoadingRecords = false;
  
 string host = "http://dainzz-001-site1.htempurl.com";
 
+ int timeLeft = -1;
+ 
+ void Test() {
+ print("---------------------------------");
+ auto cp = cast<CTrackMania>(GetApp()).CurrentPlayground;
+    if (cp is null) return;    
+    auto raceData = MLFeed::GetRaceData_V4();
+    auto elapsed = raceData.Rules_GameTime - raceData.Rules_StartTime;
+    print(elapsed);
+	print(Time::Now);
+	 print("---------------------------------");
+}
+ 
+ 
  
 void UpdateRecords() {
- 
-  	g_CurrentyUpdating = true;
-
- 
-	 CTrackMania@ app = cast<CTrackMania>(GetApp());
-    string mapUid = app.RootMap.MapInfo.MapUid;
+  	g_CurrentyUpdating = true;    
+  
+    CTrackMania@ app = cast<CTrackMania>(GetApp());
+    if(app.RootMap is null){
+        print("MAP NULL");
+        g_CurrentyUpdating = false;
+        return;
+    }
+    //string mapUid = app.RootMap.MapInfo.MapUid;
 	string mapName = app.RootMap.MapName;
  
- 
-	auto mapg = cast<CTrackMania>(GetApp()).Network.ClientManiaAppPlayground;
-    if (mapg is null) return;
-    auto scoreMgr = mapg.ScoreMgr;
-    auto userMgr = mapg.UserMgr;
-    if (scoreMgr is null || userMgr is null) return ;
-    auto players = GetPlayersInServer();
-    if (players.Length == 0) return;
- 
- 
-	auto raceData = MLFeed::GetRaceData_V4();	
+	auto raceData = MLFeed::GetRaceData_V4();
+    auto elapsed = raceData.Rules_GameTime - raceData.Rules_StartTime;
+    if(elapsed < 5000){
+        g_CurrentyUpdating = false;
+        return;
+    }
+
 	
-	if(timeLeft = -1){
-		timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime
-		if(timeLeft < 600000){
+	string mapUid = raceData.lastMap;
+	//timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
+
+if(timeLeft == -1){
+		timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;		
+		if(timeLeft < (raceData.Rules_EndTime - raceData.Rules_StartTime - 1000)){
 						Net::HttpRequest@ reqTime = Net::HttpGet(host + "/api/time/" + timeLeft);
 					while (!reqTime.Finished()) {
 					yield();
 					sleep(50);
 		}
-		else{timeLeft = -1};		
-	}
- 
-	Json::Value jsonData = Json::Array();
- 
-		for (uint i = 0; i < raceData.SortedPlayers_TimeAttack.Length; i++){
- 
-		auto player = cast<MLFeed::PlayerCpInfo_V4>(raceData.SortedPlayers_TimeAttack[i]);
- 
-		 if (g_addedTimes.Exists(player.WebServicesUserId)){
-			auto lastTime = int(g_addedTimes[player.WebServicesUserId]);
-			if(player.BestTime >= lastTime)
-				continue;
-		 }
- 
- 
-		if(player.bestTime < 1)
-			continue;
-  
-		print("New PB for player " + player.name);
-		
-		
- 
+		}
+		else{
+			timeLeft = -1;
+			}    
+}
+
+    for (uint i = 0; i < raceData.SortedPlayers_TimeAttack.Length; i++){
+        auto player = cast<MLFeed::PlayerCpInfo_V4>(raceData.SortedPlayers_TimeAttack[i]);
+        
+        if (player.bestTime < 1)
+                continue;
+        if (g_addedTimes.Exists(player.WebServicesUserId)){
+            auto existingTime = int(g_addedTimes[player.WebServicesUserId]); 
+            if(!(player.BestTime < existingTime))
+                continue;            		
+        }
+
 		//Send new pb to db
- 
-		string guid = player.WebServicesUserId;
- 
+        print("Sending PB: " + player.name + ", " + player.bestTime + ", MapId: " + mapUid);
+        
 		Json::Value playerObj = Json::Object();
  
 		playerObj["Name"] = player.name;
-		playerObj["PlayerId"] = guid;
- 
- 
-		Json::Value map = Json::Object();
- 
+		playerObj["PlayerId"] = player.WebServicesUserId;
+        
+        Json::Value map = Json::Object();
+
 		map["MapId"] = mapUid;
 		map["Name"] = mapName;	
  
-		Json::Value record = Json::Object();
+		Json::Value record = Json::Object();	
  
-			record["Time"] = player.BestTime;
-			record["Map"] = map;
-			record["Player"] = playerObj;
-			record["TimeLeft"] = timeLeft;
- 
- 
-		 string data = Json::Write(record);
- 
-		  //IO::SetClipboard(data);
- 
-			 //string url = /api/record";
-			 //string url = "http://dainzz-001-site1.htempurl.com/api/record";
-			 //string url = "http://localhost:5234/api/record";
- 
-			Net::HttpRequest@ req = Net::HttpPost(host + "/api/record", data, "application/json");
-			while (!req.Finished()) {
+		record["Time"] = player.BestTime;
+		record["Map"] = map;
+		record["Player"] = playerObj;
+		record["TimeLeft"] = Time::Stamp;
+        
+        string data = Json::Write(record);
+        
+        Net::HttpRequest@ req = Net::HttpPost(host + "/api/record", data, "application/json");
+        while (!req.Finished()) {
             yield();
             sleep(50);
-        } 
+            } 
+
  		g_addedTimes[player.WebServicesUserId] = player.bestTime;
-
- 
-  }	 		
- 
- 
-	
- 
-  	g_CurrentyUpdating = false;
+  }	 
+  g_CurrentyUpdating = false;
 }
 
 
-void UpdateAllRecords() {
- 
-	g_CurrentyUpdating = true;
-	 CTrackMania@ app = cast<CTrackMania>(GetApp());
-    string mapUid = app.RootMap.MapInfo.MapUid;
-	string mapName = app.RootMap.MapName;
- 
- 
-	auto mapg = cast<CTrackMania>(GetApp()).Network.ClientManiaAppPlayground;
-    if (mapg is null) return;
-    auto scoreMgr = mapg.ScoreMgr;
-    auto userMgr = mapg.UserMgr;
-    if (scoreMgr is null || userMgr is null) return ;
-    auto players = GetPlayersInServer();
-    if (players.Length == 0) return;
- 
- 
-	auto raceData = MLFeed::GetRaceData_V4();	
- 
-	auto timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
-	auto timestamp = Time::get_Stamp();
- 
-	//string host = "http://dainzz-001-site1.htempurl.com";
-	//string host = "http://192.168.178.75:7236";
-	//string host = "http://localhost:5234";
- 
-	Json::Value jsonData = Json::Array();
- 
-		for (uint i = 0; i < raceData.SortedPlayers_TimeAttack.Length; i++){
- 
-		auto player = cast<MLFeed::PlayerCpInfo_V4>(raceData.SortedPlayers_TimeAttack[i]);
- 
-		
-		if(player.bestTime < 1)
-			continue;
-  
-		print("Refreshbutton: Sending PB for player " + player.name);
-		
- 		//Send new pb to db
- 
-		string guid = player.WebServicesUserId;
- 
-		Json::Value playerObj = Json::Object();
- 
-		playerObj["Name"] = player.name;
-		playerObj["PlayerId"] = guid;
- 
- 
-		Json::Value map = Json::Object();
- 
-		map["MapId"] = mapUid;
-		map["Name"] = mapName;	
- 
-		Json::Value record = Json::Object();
- 
-			record["Time"] = player.BestTime;
-			record["Map"] = map;
-			record["Player"] = playerObj;
-			record["TimeLeft"] = timeLeft;
- 
- 
-		 string data = Json::Write(record);
- 
-		  //IO::SetClipboard(data);
- 
-			 //string url = /api/record";
-			 //string url = "http://dainzz-001-site1.htempurl.com/api/record";
-			 //string url = "http://localhost:5234/api/record";
- 
-			Net::HttpRequest@ req = Net::HttpPost(host + "/api/record", data, "application/json");
-			while (!req.Finished()) {
-            yield();
-            sleep(50);
-        } 
- 		g_addedTimes[player.WebServicesUserId] = player.bestTime;
-
- 
-  }	 		
- 
-Net::HttpRequest@ reqTime = Net::HttpGet(host + "/api/time/" + timeLeft);
-        while (!reqTime.Finished()) {
-            yield();
-            sleep(50);
-			}
- 
- 	g_CurrentyUpdating = false;
-
- 
-}
- 
-// fast enough to call once per frame
-uint lastLPR_Rank;
-uint lastLPR_Time;
-uint get_LocalPlayersRank() {
-    // once per frame
-    
-    return 0;
-}
  
 /* GET INFO FROM GAME */
  
@@ -353,6 +272,8 @@ void Render() {
  
      bool g_CurrentyUpdating = false;
  
+bool autoUpdate = false;
+
 void DrawUI() {
     if (!PermissionsOkay) return;
     if (!S_ShowWindow) return;
@@ -382,11 +303,17 @@ void DrawUI() {
                 if (!S_HideTopInfo) {
                     UI::AlignTextToFramePadding();
                     auto curPos1 = UI::GetCursorPos();
+                    autoUpdate = (UI::Checkbox("Autoupdate", autoUpdate));
+
                     if (g_CurrentyUpdating) {
                         UI::Text("Updating...");
                     } else {
                         if (UI::Button("Refresh##local-plrs-pbs")) {
-                            startnew(UpdateAllRecords);
+                            //startnew(UpdateAllRecords);
+                        }
+                        UI::Text("Added Records: " + g_addedTimes.GetKeys().Length);
+						 if (UI::Button("Test##local-plrs-pbs")) {
+                            startnew(Test);
                         }
                     }
  
