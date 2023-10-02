@@ -132,7 +132,7 @@ void UpdateRecords() {
  
 	auto raceData = MLFeed::GetRaceData_V4();
     auto elapsed = raceData.Rules_GameTime - raceData.Rules_StartTime;
-    if(elapsed < 5000){
+    if(elapsed < 5000 && elapsed > 0){
         g_CurrentyUpdating = false;
         return;
     }
