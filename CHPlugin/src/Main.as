@@ -130,9 +130,10 @@ void UpdateRecords() {
     //string mapUid = app.RootMap.MapInfo.MapUid;
 	string mapName = app.RootMap.MapName;
  
-	auto raceData = MLFeed::GetRaceData_V4();
+	auto raceData = MLFeed::GetRaceData_V4();  
+	auto total = raceData.Rules_EndTime - raceData.Rules_StartTime;
     auto elapsed = raceData.Rules_GameTime - raceData.Rules_StartTime;
-    if(elapsed < 5000 && elapsed > 0){
+    if(elapsed < 5000 || elapsed > total){
         g_CurrentyUpdating = false;
         return;
     }
@@ -167,7 +168,7 @@ if(timeLeft == -1){
         }
 
 		//Send new pb to db
-        print("Sending PB: " + player.name + ", " + player.bestTime + ", MapId: " + mapUid);
+        print("Sending PB:  " + elapsed + ", " + player.name + ", " + player.bestTime + ", MapId: " + mapUid);
         
 		Json::Value playerObj = Json::Object();
  
