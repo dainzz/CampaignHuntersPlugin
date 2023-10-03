@@ -311,6 +311,41 @@ void Render() {
  
 bool autoUpdate = false;
 
+
+ void CopyToClipboard() {
+     
+     auto cp = cast<CTrackMania>(GetApp()).CurrentPlayground;     
+    if (cp is null) return;    
+
+     CTrackMania@ app = cast<CTrackMania>(GetApp());
+    if(app.RootMap is null){
+        print("MAP NULL");
+        return;
+    }
+    auto raceData = MLFeed::GetRaceData_V4();
+	string mapName = app.RootMap.MapName; 	
+	string mapUid = raceData.lastMap;
+
+    string data = "";
+    for (uint i = 0; i < raceData.SortedPlayers_TimeAttack.Length; i++){
+        auto player = cast<MLFeed::PlayerCpInfo_V4>(raceData.SortedPlayers_TimeAttack[i]);
+
+		string pData = player.name + ";";
+		pData += player.WebServicesUserId  + ";";
+        
+        pData += mapUid + ";";
+		 pData += mapName + ";";	
+         pData += Time::Format(player.BestTime) + ";";		
+		pData += Time::Stamp + ";";
+
+        data += pData + "\n";
+    }
+
+    IO::SetClipboard(data);
+	 print("Copied current RaceData to Clipboard");
+}
+
+
 void DrawUI() {
     if (!PermissionsOkay) return;
     if (!S_ShowWindow) return;
@@ -345,8 +380,8 @@ void DrawUI() {
                     if (g_CurrentyUpdating) {
                         UI::Text("Updating...");
                     } else {
-                        if (UI::Button("Refresh##local-plrs-pbs")) {
-                            //startnew(UpdateAllRecords);
+                        if (UI::Button("Copy to clipboard##local-plrs-pbs")) {
+                            startnew(CopyToClipboard);
                         }
                         UI::Text("Added Records: " + g_addedTimes.GetKeys().Length);
 						 if (UI::Button("Test##local-plrs-pbs")) {
