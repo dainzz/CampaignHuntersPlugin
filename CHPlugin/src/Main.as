@@ -107,6 +107,22 @@ string host = "http://dainzz-001-site1.htempurl.com";
  
  void Test() {
  print("---------------------------------");
+     CTrackMania@ app = cast<CTrackMania>(GetApp());
+	 CSmPlayer@ smPlayer = cast<CSmPlayer>(app.CurrentPlayground.GameTerminals[0].GUIPlayer);
+        CSmScriptPlayer@ smScript = cast<CSmScriptPlayer>(smPlayer.ScriptAPI);
+	 
+	 
+
+ CGamePlaygroundClientScriptAPI@ ret = GetPlaygroundClientScriptAPISync(app);
+        while (ret is null) {
+            print("PlaygroundScript is null");
+        yield();
+        @ret = GetPlaygroundClientScriptAPISync(app);
+    }
+        print("Playground Info: Loading Screen: " + ret.IsLoadingScreen + ", GameTime: " + (ret.GameTime - smScript.StartTime));   
+return;
+ 
+ 
  auto cp = cast<CTrackMania>(GetApp()).CurrentPlayground;
     if (cp is null) return;    
     auto raceData = MLFeed::GetRaceData_V4();
@@ -116,7 +132,13 @@ string host = "http://dainzz-001-site1.htempurl.com";
 	 print("---------------------------------");
 }
  
- 
+ CGamePlaygroundClientScriptAPI@ GetPlaygroundClientScriptAPISync(CGameCtnApp@ app) {
+    try {
+        return cast<CTrackMania>(app).Network.PlaygroundClientScriptAPI;
+    } catch {}
+    return null;
+}
+
  
 void UpdateRecords() {
   	g_CurrentyUpdating = true;    
@@ -133,14 +155,28 @@ void UpdateRecords() {
 	auto raceData = MLFeed::GetRaceData_V4();  
 	auto total = raceData.Rules_EndTime - raceData.Rules_StartTime;
     auto elapsed = raceData.Rules_GameTime - raceData.Rules_StartTime;
-    if(elapsed < 5000 || elapsed > total){
-        g_CurrentyUpdating = false;
-        return;
-    }
-
-	
 	string mapUid = raceData.lastMap;
-	//timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
+
+    if(timeLeft == -1){
+        CGamePlaygroundClientScriptAPI@ ret = GetPlaygroundClientScriptAPISync(app);
+		
+        while (ret is null) {
+            print("PlaygroundScript is null");
+            yield();
+            @ret = GetPlaygroundClientScriptAPISync(app);
+        }
+        CSmPlayer@ smPlayer = cast<CSmPlayer>(app.CurrentPlayground.GameTerminals[0].GUIPlayer);
+        while (smPlayer is null) {
+            print("smPlayer is null");
+            yield();
+            @smPlayer = cast<CSmPlayer>(app.CurrentPlayground.GameTerminals[0].GUIPlayer);
+        }
+        
+        CSmScriptPlayer@ smScript = cast<CSmScriptPlayer>(smPlayer.ScriptAPI);
+		string time = Time::Format(ret.GameTime - smScript.StartTime);
+        print("Playground Info: StartTime: " + smScript.StartTime + ", CurrentTime: " + time);   
+
+    }
 
 if(timeLeft == -1){
 		timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;		
