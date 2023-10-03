@@ -176,21 +176,16 @@ void UpdateRecords() {
 		string time = Time::Format(ret.GameTime - smScript.StartTime);
         print("Playground Info: StartTime: " + smScript.StartTime + ", CurrentTime: " + time);   
 
-    }
-
-if(timeLeft == -1){
-		timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;		
-		if(timeLeft < (raceData.Rules_EndTime - raceData.Rules_StartTime - 1000)){
+    timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
+        print("Synchronizing timer, time left: " + Time::Format(timeLeft));
 						Net::HttpRequest@ reqTime = Net::HttpGet(host + "/api/time/" + timeLeft);
 					while (!reqTime.Finished()) {
 					yield();
 					sleep(50);
-		}
-		}
-		else{
-			timeLeft = -1;
-			}    
-}
+		}		
+    }
+
+
 
     for (uint i = 0; i < raceData.SortedPlayers_TimeAttack.Length; i++){
         auto player = cast<MLFeed::PlayerCpInfo_V4>(raceData.SortedPlayers_TimeAttack[i]);
