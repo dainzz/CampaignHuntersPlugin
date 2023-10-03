@@ -177,6 +177,11 @@ void UpdateRecords() {
         print("Playground Info: StartTime: " + smScript.StartTime + ", CurrentTime: " + time);   
 
     timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
+	while (timeLeft < 0) {
+            print("time < 0, round probably didnt start yet");
+            yield();
+			timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
+        }	
         print("Synchronizing timer, time left: " + Time::Format(timeLeft));
 						Net::HttpRequest@ reqTime = Net::HttpGet(host + "/api/time/" + timeLeft);
 					while (!reqTime.Finished()) {
