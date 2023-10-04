@@ -73,7 +73,7 @@ bool get_PlaygroundNotNullAndEditorNull() {
  
 // returns true if should exit because we're in solo mode
 bool SoloModeExitCheck() {
-    return S_HideInSoloMode && GetApp().PlaygroundScript !is null;
+    return GetApp().PlaygroundScript !is null;
 }
  
  
@@ -83,7 +83,7 @@ bool SoloModeExitCheck() {
 void Update(float dt) {
     if (g_mlfeedDetected) {
         if (PlaygroundNotNullAndEditorNull) {
-             if (autoUpdate && lastPbUpdate + 1000 < Time::Now && !g_CurrentyUpdating) { 
+             if (autoUpdate && lastPbUpdate + S_SyncInterval < Time::Now && !g_CurrentyUpdating) { 
                  startnew(UpdateRecords);
                  lastPbUpdate = Time::Now; 
                  }
@@ -102,6 +102,8 @@ uint g_PlayersInServerLast = 0;
 bool g_CurrentlyLoadingRecords = false;
  
 string host = "http://dainzz-001-site1.htempurl.com";
+//string host = "http://192.168.178.75:5234";
+
 
  int timeLeft = -1;
  
@@ -142,7 +144,7 @@ return;
  
 void UpdateRecords() {
   	g_CurrentyUpdating = true;    
-  
+	print("Startuing sync...");
     CTrackMania@ app = cast<CTrackMania>(GetApp());
     if(app.RootMap is null){
         print("MAP NULL");
@@ -190,7 +192,7 @@ void UpdateRecords() {
 		}		
     }
 
-
+	Json::Value jsonData = Json::Array();
 
     for (uint i = 0; i < raceData.SortedPlayers_TimeAttack.Length; i++){
         auto player = cast<MLFeed::PlayerCpInfo_V4>(raceData.SortedPlayers_TimeAttack[i]);
@@ -223,16 +225,20 @@ void UpdateRecords() {
 		record["Player"] = playerObj;
 		record["TimeLeft"] = Time::Stamp;
         
-        string data = Json::Write(record);
+        jsonData.Add(record);
         
-        Net::HttpRequest@ req = Net::HttpPost(host + "/api/record", data, "application/json");
+ 		g_addedTimes[player.WebServicesUserId] = player.bestTime;
+  }	 
+
+string data = Json::Write(jsonData);
+        
+        Net::HttpRequest@ req = Net::HttpPost(host + "/api/records", data, "application/json");
         while (!req.Finished()) {
             yield();
             sleep(50);
             } 
 
- 		g_addedTimes[player.WebServicesUserId] = player.bestTime;
-  }	 
+
   g_CurrentyUpdating = false;
 }
 
@@ -272,17 +278,7 @@ array<CSmPlayer@>@ GetPlayersInServer() {
  
 /* hotkey */
  
-/** Called whenever a key is pressed on the keyboard. See the documentation for the [`VirtualKey` enum](https://openplanet.dev/docs/api/global/VirtualKey). */
-UI::InputBlocking OnKeyPress(bool down, VirtualKey key) {
-    if (!down || !S_HotkeyEnabled) return UI::InputBlocking::DoNothing;
-    if (key == S_Hotkey) {
-        if (!PlaygroundNotNullAndEditorNull || SoloModeExitCheck()) return UI::InputBlocking::DoNothing;
-        S_ShowWindow = !S_ShowWindow;
-        UI::ShowNotification(Meta::ExecutingPlugin().Name, "Toggled visibility", vec4(0.1, 0.4, 0.8, 0.4));
-        return UI::InputBlocking::Block;
-    }
-    return UI::InputBlocking::DoNothing;
-}
+
  
  
 /* DRAW UI */
@@ -302,7 +298,7 @@ void RenderInterface() {
 }
  
 void Render() {
-    if (S_ShowWhenUIHidden && !UI::IsOverlayShown()) {
+    if (!UI::IsOverlayShown()) {
         DrawUI();
     }
 }
@@ -326,7 +322,7 @@ bool autoUpdate = false;
 	string mapName = app.RootMap.MapName; 	
 	string mapUid = raceData.lastMap;
 
-    string data = "";
+    string data = "RaceData: \n\n";
     for (uint i = 0; i < raceData.SortedPlayers_TimeAttack.Length; i++){
         auto player = cast<MLFeed::PlayerCpInfo_V4>(raceData.SortedPlayers_TimeAttack[i]);
 
@@ -341,6 +337,15 @@ bool autoUpdate = false;
         data += pData + "\n";
     }
 
+auto keys = g_addedTimes.GetKeys();
+
+string DictData = "\nDictData: \n\n";
+for(int i = 0; i < keys.Length; i++){
+    int time = int(g_addedTimes[keys[i]]);
+    DictData += keys[i] + ";" + time + ";\n";
+}
+
+data += DictData;
     IO::SetClipboard(data);
 	 print("Copied current RaceData to Clipboard");
 }
@@ -354,11 +359,7 @@ void DrawUI() {
     if (!PlaygroundNotNullAndEditorNull) return;
  
     int uiFlags = UI::WindowFlags::NoCollapse;
-    if (S_LockWhenUIHidden && !UI::IsOverlayShown())
-        uiFlags = uiFlags | UI::WindowFlags::NoInputs;
-    bool showTitleBar = S_TitleBarWhenUnlocked && UI::IsOverlayShown();
-    if (!showTitleBar)
-        uiFlags = uiFlags | UI::WindowFlags::NoTitleBar;
+    
  
  
     UI::SetNextWindowSize(100, 100, UI::Cond::FirstUseEver);
@@ -372,7 +373,7 @@ void DrawUI() {
             if (UI::BeginChild("##pbs-full-ui", UI::GetContentRegionAvail())) {
  
                 // refresh/loading    #N Players: 22    Your Rank: 19 / 22
-                if (!S_HideTopInfo) {
+          
                     UI::AlignTextToFramePadding();
                     auto curPos1 = UI::GetCursorPos();
                     autoUpdate = (UI::Checkbox("Autoupdate", autoUpdate));
@@ -384,13 +385,16 @@ void DrawUI() {
                             startnew(CopyToClipboard);
                         }
                         UI::Text("Added Records: " + g_addedTimes.GetKeys().Length);
-						 if (UI::Button("Test##local-plrs-pbs")) {
-                            startnew(Test);
+                        
+                        bool pressedEnter = false;
+                        string hostTextBox = UI::InputText("API Host", host, pressedEnter, UI::InputTextFlags::EnterReturnsTrue);
+                        if (pressedEnter) {
+                                    host = hostTextBox;
                         }
                     }
  
  
-                }
+               
  
  
  
