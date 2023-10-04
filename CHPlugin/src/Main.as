@@ -144,7 +144,6 @@ return;
  
 void UpdateRecords() {
   	g_CurrentyUpdating = true;    
-	print("Startuing sync...");
     CTrackMania@ app = cast<CTrackMania>(GetApp());
     if(app.RootMap is null){
         print("MAP NULL");
@@ -199,14 +198,18 @@ void UpdateRecords() {
         
         if (player.bestTime < 1)
                 continue;
-        if (g_addedTimes.Exists(player.WebServicesUserId)){
+        if (g_addedTimes.Exists(player.WebServicesUserId)){            
             auto existingTime = int(g_addedTimes[player.WebServicesUserId]); 
-            if(!(player.BestTime < existingTime))
-                continue;            		
+            if(!(player.BestTime < existingTime)){
+                continue;  
+            }
+            else{
+                print("Found improved record for " + player.name + ": " + existingTime + " => " + player.bestTime);
+            }
+        }		
+        else{
+            print("Found new record for " + player.name + ": "  + player.bestTime);
         }
-
-		//Send new pb to db
-        print("Sending PB:  " + elapsed + ", " + player.name + ", " + player.bestTime + ", MapId: " + mapUid);
         
 		Json::Value playerObj = Json::Object();
  
@@ -230,13 +233,18 @@ void UpdateRecords() {
  		g_addedTimes[player.WebServicesUserId] = player.bestTime;
   }	 
 
-string data = Json::Write(jsonData);
-        
+if(jsonData.Length > 0){
+    print("Sending records to API.");
+    string data = Json::Write(jsonData);
+
         Net::HttpRequest@ req = Net::HttpPost(host + "/api/records", data, "application/json");
         while (!req.Finished()) {
             yield();
             sleep(50);
             } 
+
+}
+
 
 
   g_CurrentyUpdating = false;
