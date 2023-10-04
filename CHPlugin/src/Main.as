@@ -4,7 +4,10 @@ void Main() {
         return;
     }
     trace("MLFeed detected: " + tostring(g_mlfeedDetected));
-    startnew(MainLoop);
+    //startnew(MainLoop);
+	
+	g_APIToken = getToken();
+	print("Token is " + g_APIToken);
 }
  
 bool get_PermissionsOkay() {
@@ -24,6 +27,7 @@ void NotifyMissingPermissions() {
 
 
 dictionary g_addedTimes;
+string g_APIToken;
 
 uint lastPbUpdate = 0;
  
@@ -33,39 +37,6 @@ bool g_mlfeedDetected = true;
 bool g_mlfeedDetected = false;
 #endif
 
-
-
-
-
-void MainLoop() {
-    return;
-    // when current playground becomes not-null, get records
-    // when player count changes, get records
-    // when playground goes null, reset
-    while (PermissionsOkay) {
-        yield();
-        if (PlaygroundNotNullAndEditorNull) {
-            print("Entering Update loop");
-            lastPbUpdate = Time::Now; // set this here to avoid triggering immediately
-            while (PlaygroundNotNullAndEditorNull) {
-                yield();
-                if (lastPbUpdate + 1000 < Time::Now && !g_CurrentyUpdating) {               
-                    startnew(UpdateRecords);
-                    lastPbUpdate = Time::Now; // bc we start it in a coro; don't want to run twice
-                }
-            }
-			
-			print("Clearing addedTimes");
-            g_addedTimes.DeleteAll();
-			print(g_addedTimes.GetSize());
-			timeLeft = -1;
-			g_CurrentyUpdating = false;
-        }
-        // wait while playground is null or we aren't showing the window
-        while (!PlaygroundNotNullAndEditorNull) yield();
-        print("Playground is not null again, new map loaded?");
-    }
-}
  
 bool get_PlaygroundNotNullAndEditorNull() {
     return GetApp().CurrentPlayground !is null && GetApp().Editor is null;
@@ -77,7 +48,32 @@ bool SoloModeExitCheck() {
 }
  
  
-     
+string getToken(){
+
+		Json::Value login = Json::Object();
+		login["username"] = S_Username;
+		login["password"] = S_Password;
+
+    string data = Json::Write(login);
+
+        Net::HttpRequest@ req = Net::HttpPost(host + "/api/login", data, "application/json");
+									
+
+        while (!req.Finished()) {
+            yield();
+            sleep(50);
+            } 
+		if (req.ResponseCode() != 200) {
+		error("Unable to authenticate, http error " + req.ResponseCode());
+		return "";
+	}
+
+	// Parse the server response
+	auto js = Json::Parse(req.String());
+	
+	return js["token"];
+	
+}
 
  
 void Update(float dt) {
@@ -181,10 +177,12 @@ void UpdateRecords() {
 	while (timeLeft < 0) {
             print("time < 0, round probably didnt start yet");
             yield();
+			sleep(200);
 			timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
         }	
         print("Synchronizing timer, time left: " + Time::Format(timeLeft));
 						Net::HttpRequest@ reqTime = Net::HttpGet(host + "/api/time/" + timeLeft);
+							reqTime.Headers["Authorization"] = "Bearer " + g_APIToken;
 					while (!reqTime.Finished()) {
 					yield();
 					sleep(50);
@@ -198,10 +196,11 @@ void UpdateRecords() {
         
         if (player.bestTime < 1)
                 continue;
+		
         if (g_addedTimes.Exists(player.WebServicesUserId)){            
             auto existingTime = int(g_addedTimes[player.WebServicesUserId]); 
             if(!(player.BestTime < existingTime)){
-                continue;  
+                if(S_FilterOldTimes)continue;  
             }
             else{
                 print("Found improved record for " + player.name + ": " + existingTime + " => " + player.bestTime);
@@ -238,6 +237,8 @@ if(jsonData.Length > 0){
     string data = Json::Write(jsonData);
 
         Net::HttpRequest@ req = Net::HttpPost(host + "/api/records", data, "application/json");
+									reqTime.Headers["Authorization"] = "Bearer " + g_APIToken;
+
         while (!req.Finished()) {
             yield();
             sleep(50);
