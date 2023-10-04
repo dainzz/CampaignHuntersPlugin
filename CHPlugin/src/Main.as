@@ -97,9 +97,7 @@ void Update(float dt) {
 uint g_PlayersInServerLast = 0;
 bool g_CurrentlyLoadingRecords = false;
  
-//string host = S_Host;
-//string host = "http://192.168.178.75:5234";
-
+ 
 
  int timeLeft = -1;
  
@@ -181,9 +179,13 @@ void UpdateRecords() {
 			timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
         }	
         print("Synchronizing timer, time left: " + Time::Format(timeLeft));
-						Net::HttpRequest@ reqTime = Net::HttpGet(S_Host + "/api/time/" + timeLeft);
-							reqTime.Headers["Authorization"] = "Bearer " + g_APIToken;
-					while (!reqTime.Finished()) {
+						
+						auto req = Net::HttpRequest();
+	req.Method = Net::HttpMethod::Get;
+	req.Url = S_Host + "/api/time/" + timeLeft;
+	req.Headers["Authorization"] = "Bearer " + g_APIToken;
+	req.Start();
+					while (!req.Finished()) {
 					yield();
 					sleep(50);
 		}	
@@ -237,8 +239,15 @@ if(jsonData.Length > 0){
     print("Sending records to API.");
     string data = Json::Write(jsonData);
 
-        Net::HttpRequest@ req = Net::HttpPost(S_Host + "/api/records", data, "application/json");
-									req.Headers["Authorization"] = "Bearer " + g_APIToken;
+
+		auto req = Net::HttpRequest();
+	req.Method = Net::HttpMethod::Post;
+	req.Url = S_Host + "/api/records";
+	req.Headers["Content-Type"] = "application/json";
+	req.Headers["Authorization"] = "Bearer " + g_APIToken;
+		req.Body = data;
+	req.Start();
+       
 
         while (!req.Finished()) {
             yield();
