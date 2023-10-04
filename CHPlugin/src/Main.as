@@ -56,7 +56,7 @@ string getToken(){
 
     string data = Json::Write(login);
 
-        Net::HttpRequest@ req = Net::HttpPost(host + "/api/login", data, "application/json");
+        Net::HttpRequest@ req = Net::HttpPost(S_Host + "/api/login", data, "application/json");
 									
 
         while (!req.Finished()) {
@@ -87,7 +87,7 @@ void Update(float dt) {
                     else{
                 g_addedTimes.DeleteAll();
                 timeLeft = -1;
-                print("Map Change, resetting data.");
+                //print("Map Change, resetting data.");
             }
         }
     if(!g_mlfeedDetected)
@@ -97,7 +97,7 @@ void Update(float dt) {
 uint g_PlayersInServerLast = 0;
 bool g_CurrentlyLoadingRecords = false;
  
-string host = "http://dainzz-001-site1.htempurl.com";
+//string host = S_Host;
 //string host = "http://192.168.178.75:5234";
 
 
@@ -181,12 +181,13 @@ void UpdateRecords() {
 			timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
         }	
         print("Synchronizing timer, time left: " + Time::Format(timeLeft));
-						Net::HttpRequest@ reqTime = Net::HttpGet(host + "/api/time/" + timeLeft);
+						Net::HttpRequest@ reqTime = Net::HttpGet(S_Host + "/api/time/" + timeLeft);
 							reqTime.Headers["Authorization"] = "Bearer " + g_APIToken;
 					while (!reqTime.Finished()) {
 					yield();
 					sleep(50);
-		}		
+		}	
+		
     }
 
 	Json::Value jsonData = Json::Array();
@@ -236,13 +237,15 @@ if(jsonData.Length > 0){
     print("Sending records to API.");
     string data = Json::Write(jsonData);
 
-        Net::HttpRequest@ req = Net::HttpPost(host + "/api/records", data, "application/json");
-									reqTime.Headers["Authorization"] = "Bearer " + g_APIToken;
+        Net::HttpRequest@ req = Net::HttpPost(S_Host + "/api/records", data, "application/json");
+									req.Headers["Authorization"] = "Bearer " + g_APIToken;
 
         while (!req.Finished()) {
             yield();
             sleep(50);
             } 
+			if (req.ResponseCode() != 200) {
+		error("API Error, http error " + req.ResponseCode());}
 
 }
 
@@ -395,11 +398,7 @@ void DrawUI() {
                         }
                         UI::Text("Added Records: " + g_addedTimes.GetKeys().Length);
                         
-                        bool pressedEnter = false;
-                        string hostTextBox = UI::InputText("API Host", host, pressedEnter, UI::InputTextFlags::EnterReturnsTrue);
-                        if (pressedEnter) {
-                                    host = hostTextBox;
-                        }
+                      
                     }
  
  
