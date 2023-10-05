@@ -7,7 +7,7 @@ void Main() {
     //startnew(MainLoop);
 	
 	g_APIToken = getToken();
-	print("Token is " + g_APIToken);
+	//print("Token is " + g_APIToken);
 }
  
 bool get_PermissionsOkay() {
