@@ -42,10 +42,6 @@ bool get_PlaygroundNotNullAndEditorNull() {
     return GetApp().CurrentPlayground !is null && GetApp().Editor is null;
 }
  
-// returns true if should exit because we're in solo mode
-bool SoloModeExitCheck() {
-    return GetApp().PlaygroundScript !is null;
-}
  
  
 string getToken(){
@@ -75,64 +71,82 @@ string getToken(){
 	
 }
 
- 
+ bool ValidState(){
+    CTrackMania@ app = cast<CTrackMania>(GetApp());
+    if(app.PlaygroundScript !is null) return false; //Solomode
+    if(app.Editor !is null) return false; //Editor
+    if(app.RootMap is null) return false; //Main Menu
+    return true;
+ }
+ bool RoundStarted(){
+   	auto raceData = MLFeed::GetRaceData_V4(); 
+    //timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
+    //int totalTime = raceData.Rules_EndTime - raceData.Rules_StartTime; might be < 0 before round starts
+    //if(timeLeft > 0 )
+    //    return true;
+    if(raceData.Rules_StartTime > 0 && raceData.Rules_EndTime > 0)
+        return true;
+    return false;
+ }
+
+string g_PreviousMap = "";
+
+ bool NewMap(){
+    CTrackMania@ app = cast<CTrackMania>(GetApp());
+    if(app.RootMap is null){
+       return false;}
+    if(g_PreviousMap != app.RootMap.IdName)
+    {
+        g_PreviousMap = app.RootMap.IdName;
+        return true;
+    }
+    return false;
+ }
+
 void Update(float dt) {
     if (g_mlfeedDetected) {
         if (PlaygroundNotNullAndEditorNull) {
-             if (autoUpdate && lastPbUpdate + S_SyncInterval < Time::Now && !g_CurrentyUpdating) { 
+             if (autoUpdate && lastPbUpdate + S_SyncInterval < Time::Now && !g_CurrentyUpdating) {
+                if(!ValidState()) return; 
+                if(!RoundStarted()) return;
+                if(NewMap()){
+                    g_TimerSynced = false;  
+                    g_addedTimes.DeleteAll();              
+                }                
                  startnew(UpdateRecords);
                  lastPbUpdate = Time::Now; 
                  }
         }
-                    else{
-                g_addedTimes.DeleteAll();
-                timeLeft = -1;
-                //print("Map Change, resetting data.");
-            }
+                
         }
-    if(!g_mlfeedDetected)
-        print("no MLFeed");
+   
 }
- 
-uint g_PlayersInServerLast = 0;
-bool g_CurrentlyLoadingRecords = false;
- 
- 
 
- int timeLeft = -1;
+
+bool g_CurrentyUpdating = false;
+bool autoUpdate = false;
+bool g_TimerSynced = false;
+ 
  
  void Test() {
  print("---------------------------------");
-     CTrackMania@ app = cast<CTrackMania>(GetApp());
-	 CSmPlayer@ smPlayer = cast<CSmPlayer>(app.CurrentPlayground.GameTerminals[0].GUIPlayer);
-        CSmScriptPlayer@ smScript = cast<CSmScriptPlayer>(smPlayer.ScriptAPI);
-	 
-	 
-
- CGamePlaygroundClientScriptAPI@ ret = GetPlaygroundClientScriptAPISync(app);
-        while (ret is null) {
-            print("PlaygroundScript is null");
-        yield();
-        @ret = GetPlaygroundClientScriptAPISync(app);
-    }
-        print("Playground Info: Loading Screen: " + ret.IsLoadingScreen + ", GameTime: " + (ret.GameTime - smScript.StartTime));   
+     auto mapg = cast<CTrackMania>(GetApp()).Network.ClientManiaAppPlayground;
+            if (mapg is null) {print("MAP IS NULL");return;}
+            auto scoreMgr = mapg.ScoreMgr;
+            auto userMgr = mapg.UserMgr;
+            if (scoreMgr is null || userMgr is null)
+            {
+                print("Score or User is null");
+            };
+	auto raceData = MLFeed::GetRaceData_V4(); 
+        print(raceData.SortedPlayers_TimeAttack.Length);
 return;
- 
- 
- auto cp = cast<CTrackMania>(GetApp()).CurrentPlayground;
-    if (cp is null) return;    
-    auto raceData = MLFeed::GetRaceData_V4();
-    auto elapsed = raceData.Rules_GameTime - raceData.Rules_StartTime;
-    print(elapsed);
-	print(Time::Now);
-	 print("---------------------------------");
-}
- 
- CGamePlaygroundClientScriptAPI@ GetPlaygroundClientScriptAPISync(CGameCtnApp@ app) {
-    try {
-        return cast<CTrackMania>(app).Network.PlaygroundClientScriptAPI;
-    } catch {}
-    return null;
+    for(int i = 0; i < raceData.SortedPlayers_TimeAttack.Length;i++){
+        auto player = cast<MLFeed::PlayerCpInfo_V4>(raceData.SortedPlayers_TimeAttack[i]);
+        if(player.bestTime > 0)
+            print(player.name + ": " + Time::Format(player.bestTime));
+    }
+
 }
 
  
@@ -144,53 +158,29 @@ void UpdateRecords() {
         g_CurrentyUpdating = false;
         return;
     }
-    //string mapUid = app.RootMap.MapInfo.MapUid;
 	string mapName = app.RootMap.MapName;
  
-	auto raceData = MLFeed::GetRaceData_V4();  
-	auto total = raceData.Rules_EndTime - raceData.Rules_StartTime;
-    auto elapsed = raceData.Rules_GameTime - raceData.Rules_StartTime;
+	auto raceData = MLFeed::GetRaceData_V4(); 
+
 	string mapUid = raceData.lastMap;
 
-    if(timeLeft == -1){
-        CGamePlaygroundClientScriptAPI@ ret = GetPlaygroundClientScriptAPISync(app);
-		
-        while (ret is null) {
-            print("PlaygroundScript is null");
-            yield();
-            @ret = GetPlaygroundClientScriptAPISync(app);
-        }
-        CSmPlayer@ smPlayer = cast<CSmPlayer>(app.CurrentPlayground.GameTerminals[0].GUIPlayer);
-        while (smPlayer is null) {
-            print("smPlayer is null");
-            yield();
-            @smPlayer = cast<CSmPlayer>(app.CurrentPlayground.GameTerminals[0].GUIPlayer);
-        }
-        
-        CSmScriptPlayer@ smScript = cast<CSmScriptPlayer>(smPlayer.ScriptAPI);
-		string time = Time::Format(ret.GameTime - smScript.StartTime);
-        print("Playground Info: StartTime: " + smScript.StartTime + ", CurrentTime: " + time);   
-
-    timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
-	while (timeLeft < 0) {
-            print("time < 0, round probably didnt start yet");
-            yield();
-			sleep(200);
-			timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
-        }	
-        print("Synchronizing timer, time left: " + Time::Format(timeLeft));
-						
-						auto req = Net::HttpRequest();
-	req.Method = Net::HttpMethod::Get;
-	req.Url = S_Host + "/api/time/" + timeLeft;
-	req.Headers["Authorization"] = "Bearer " + g_APIToken;
-	req.Start();
-					while (!req.Finished()) {
+    if(!g_TimerSynced){  
+        auto timeLeft = raceData.Rules_EndTime - raceData.Rules_GameTime;
+        if (timeLeft > 0) {
+           print("Synchronizing timer, time left: " + Time::Format(timeLeft));
+           auto req = Net::HttpRequest();
+            req.Method = Net::HttpMethod::Get;
+            req.Url = S_Host + "/api/time/" + timeLeft;
+            req.Headers["Authorization"] = "Bearer " + g_APIToken;
+            req.Start();
+            while (!req.Finished()) {
 					yield();
 					sleep(50);
-		}	
-		
-    }
+                    }	
+           g_TimerSynced = true;
+           }
+           }
+
 
 	Json::Value jsonData = Json::Array();
 
@@ -236,71 +226,30 @@ void UpdateRecords() {
   }	 
 
 if(jsonData.Length > 0){
-    print("Sending records to API.");
+    print("Sending " + jsonData.Length + " records to API.");
     string data = Json::Write(jsonData);
-
-
-		auto req = Net::HttpRequest();
+    auto req = Net::HttpRequest();
 	req.Method = Net::HttpMethod::Post;
 	req.Url = S_Host + "/api/records";
 	req.Headers["Content-Type"] = "application/json";
 	req.Headers["Authorization"] = "Bearer " + g_APIToken;
-		req.Body = data;
+    req.Body = data;
 	req.Start();
-       
-
-        while (!req.Finished()) {
+    
+    while (!req.Finished()) {
             yield();
             sleep(50);
             } 
 			if (req.ResponseCode() != 200) {
-		error("API Error, http error " + req.ResponseCode());}
+                error("API Error, HTTP Error " + req.ResponseCode());
+                }
 
 }
 
-
-
-  g_CurrentyUpdating = false;
+ g_CurrentyUpdating = false;
 }
 
 
- 
-/* GET INFO FROM GAME */
- 
-uint GetPlayersInServerCount() {
-    auto cp = cast<CTrackMania>(GetApp()).CurrentPlayground;
-    if (cp is null) return 0;
-    return cp.Players.Length;
-}
- 
-string GetLocalPlayerWSID() {
-    try {
-        return GetApp().Network.ClientManiaAppPlayground.LocalUser.WebServicesUserId;
-    } catch {
-        return "";
-    }
-}
- 
-// array<CGamePlayer@>@ GetPlayersInServer() {
-array<CSmPlayer@>@ GetPlayersInServer() {
-    auto cp = cast<CTrackMania>(GetApp()).CurrentPlayground;
-    if (cp is null) return {};
-    array<CSmPlayer@> ret;
-    for (uint i = 0; i < cp.Players.Length; i++) {
-        auto player = cast<CSmPlayer>(cp.Players[i]);
-        if (player !is null) ret.InsertLast(player);
-    }
-    return ret;
-}
- 
-// Returns a sorted list of player PB time objects. This is assumed to be called only from UpdateRecords().
-
- 
- 
-/* hotkey */
- 
-
- 
  
 /* DRAW UI */
  
@@ -324,9 +273,7 @@ void Render() {
     }
 }
  
-     bool g_CurrentyUpdating = false;
  
-bool autoUpdate = false;
 
 
  void CopyToClipboard() {
@@ -373,28 +320,17 @@ data += DictData;
 
 
 void DrawUI() {
-    if (!PermissionsOkay) return;
-    if (!S_ShowWindow) return;
-    if (SoloModeExitCheck()) return;
-    // if no map or no editor
-    if (!PlaygroundNotNullAndEditorNull) return;
+    if (!S_ShowWindow) return;  
  
     int uiFlags = UI::WindowFlags::NoCollapse;
-    
- 
  
     UI::SetNextWindowSize(100, 100, UI::Cond::FirstUseEver);
     if (UI::Begin("Campaign Hunters", S_ShowWindow, uiFlags)) {
-        if (GetApp().CurrentPlayground is null || GetApp().Editor !is null) {
-            UI::Text("Not in a map \\$999(or in editor).");
-        } 
-		else {
+   
  
             // put everything in a child so buttons work when interface is hidden
             if (UI::BeginChild("##pbs-full-ui", UI::GetContentRegionAvail())) {
- 
-                // refresh/loading    #N Players: 22    Your Rank: 19 / 22
-          
+           
                     UI::AlignTextToFramePadding();
                     auto curPos1 = UI::GetCursorPos();
                     autoUpdate = (UI::Checkbox("Autoupdate", autoUpdate));
@@ -404,6 +340,9 @@ void DrawUI() {
                     } else {
                         if (UI::Button("Copy to clipboard##local-plrs-pbs")) {
                             startnew(CopyToClipboard);
+                        } 
+                        if (UI::Button("Print RaceData Length##local-plrs-pbs")) {
+                            startnew(Test);
                         }
                         UI::Text("Added Records: " + g_addedTimes.GetKeys().Length);
                         
@@ -417,7 +356,7 @@ void DrawUI() {
  
             }
             UI::EndChild();
-        }
+        
     }
     UI::End();
 }
