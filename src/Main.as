@@ -10,6 +10,7 @@ void Main() {
     }   
 
 	g_APIToken = getToken();
+    
     startnew(InitCoro);
 }
 
@@ -23,6 +24,9 @@ void InitCoro() {
     MLHook::InjectManialinkToPlayground(PageUID, manialinkScript, true);
     yield();
     yield();
+            auto pg = get_cp();   
+
+    if(pg.Arena.Rules.RulesStateEndTime  != 4294967295) roundStarted = true;
     startnew(CoroutineFunc(playerFinishedHook.MainCoro));
 }
 
@@ -45,7 +49,7 @@ int get_CurrentRaceTime() {
      return ControlledPlayer_ScriptAPI.CurrentRaceTime;
  }
 
-
+bool roundStarted = false;
 
 class MapChangeHook : MLHook::HookMLEventsByType {
     MapChangeHook() {
@@ -55,6 +59,7 @@ class MapChangeHook : MLHook::HookMLEventsByType {
     void OnEvent(MLHook::PendingEvent@ event) override {
         if(!enabled) return;
         Log("Received Mapchange Event.");
+        roundStarted = false;
         startnew(CoroutineFunc(this.SyncOnRoundStart));
     }
 
@@ -64,6 +69,8 @@ class MapChangeHook : MLHook::HookMLEventsByType {
         while(pg.Arena.Rules.RulesStateEndTime  == 4294967295 ){
                     yield();                    
         }
+
+        roundStarted = true;
         
 
         auto timeleft = pg.Arena.Rules.RulesStateEndTime - pg.Arena.Rules.RulesStateStartTime;
@@ -91,6 +98,16 @@ class PlayerFinishedHook : MLHook::HookMLEventsByType {
 
     void OnEvent(MLHook::PendingEvent@ event) override {
         if(!enabled) return;
+        if(!roundStarted){
+            string name = event.data[0];
+            string id = event.data[1];
+            string timestamp = event.data[2];
+            uint time = Text::ParseUInt(event.data[3]);            
+            string mapUid = event.data[4];
+            Log("Ignoring incoming record, round didnt start yet. ("+ name + ", " + Time::Format(time) + ", " + mapUid + ")");
+
+            return;
+        } 
         pendingEvents.InsertLast(event);
     }
 
@@ -139,7 +156,7 @@ void SendToAPI() {
 		record["Player"] = playerObj;
 		record["TimeLeft"] = timestamp; 
 
-        Log("Adding record to json: " + name + ", " + id + ", " + time + ", " + timestamp);
+        Log("Adding record to json: " + name + ", " + id + ", " + Time::Format(time) + ", " + Time::FormatString("%H:%M:%S", Text::ParseInt64(timestamp)));
         jsonData.Add(record);              
     }
                 string data = Json::Write(jsonData);

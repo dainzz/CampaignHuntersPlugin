@@ -3,8 +3,6 @@
 #Include "TextLib" as TL
 #Include "TimeLib" as TimeLib
 
- 
-
 declare Text G_PreviousMapUid;
 
 // logging function, should be "MLHook_LogMe_" + PageUID
@@ -82,6 +80,8 @@ Void CheckMapChange() {
          SendCustomEvent("MLHook_Event_" ^ C_PageUID ^ "_MapChange", [G_PreviousMapUid]);
     } 
 }
+
+
 
 
 Void CheckIncoming() {
