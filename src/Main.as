@@ -35,6 +35,7 @@ void OnDisabled() { _Unload(); }
 void _Unload() {
     trace('_Unload, unloading all hooks and removing all injected ML');
     MLHook::UnregisterMLHooksAndRemoveInjectedML();
+        MLHook::RemoveInjectedMLFromPlayground(PageUID);
 } 
 
 string get_CurrentMap() {
@@ -112,6 +113,7 @@ class PlayerFinishedHook : MLHook::HookMLEventsByType {
     }
 
     void MainCoro() {      
+        MLHook::Queue_MessageManialinkPlayground(PageUID, {"SendAllPlayerStates"});
         while (true) {
               yield();
             if(enabled && lastPbUpdate + S_SyncInterval < Time::Now ){
