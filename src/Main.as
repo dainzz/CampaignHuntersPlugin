@@ -2,7 +2,7 @@ const string PageUID = "CHRaceStats";
 
 PlayerFinishedHook@ playerFinishedHook = PlayerFinishedHook();
 MapChangeHook@ mapChangeHook = MapChangeHook();
-
+CSVHook@ csvHook = CSVHook();
 void Main() {    
     if (!PermissionsOkay) {
         NotifyMissingPermissions();
@@ -17,6 +17,9 @@ void Main() {
 void InitCoro() {   
     MLHook::RegisterMLHook(playerFinishedHook, PageUID + "_NewRecord");
     MLHook::RegisterMLHook(mapChangeHook, PageUID + "_MapChange");
+	MLHook::RegisterMLHook(csvHook, PageUID + "_CSVRecords");
+	
+	
     sleep(50);
     yield();
     IO::FileSource refreshCode("CHRaceStatsFeed.Script.txt");
@@ -24,8 +27,11 @@ void InitCoro() {
     MLHook::InjectManialinkToPlayground(PageUID, manialinkScript, true);
     yield();
     yield();
-            auto pg = get_cp();   
-
+	auto pg = get_cp();   	
+	while(pg == null)
+	{
+		yield();
+	}
     if(pg.Arena.Rules.RulesStateEndTime  != 4294967295) roundStarted = true;
     startnew(CoroutineFunc(playerFinishedHook.MainCoro));
 }
@@ -90,6 +96,27 @@ class MapChangeHook : MLHook::HookMLEventsByType {
     }
 }
 
+   void getCSV(){
+        MLHook::Queue_MessageManialinkPlayground(PageUID, {"SendCSV"});
+    }
+
+
+class CSVHook : MLHook::HookMLEventsByType {
+    CSVHook() {
+        super(PageUID);
+    }
+   
+    void OnEvent(MLHook::PendingEvent@ event) override {        
+        Log("Received CSV Event.");
+		IO::SetClipboard(event.data[0]);
+    }
+
+    void WriteToFile(){
+        
+    }
+}
+
+
 class PlayerFinishedHook : MLHook::HookMLEventsByType {
     PlayerFinishedHook() {
         super(PageUID);
@@ -112,7 +139,7 @@ class PlayerFinishedHook : MLHook::HookMLEventsByType {
         pendingEvents.InsertLast(event);
     }
 
-    void MainCoro() {      
+    void MainCoro() {              
         MLHook::Queue_MessageManialinkPlayground(PageUID, {"SendAllPlayerStates"});
         while (true) {
               yield();
@@ -124,6 +151,8 @@ class PlayerFinishedHook : MLHook::HookMLEventsByType {
         }
     }
 
+
+ 
 
 void SendToAPI() {
     
@@ -278,8 +307,9 @@ void DrawUI() {
                     UI::AlignTextToFramePadding();
                     enabled = (UI::Checkbox("Enabled", enabled));
 
-                     if (UI::Button("Get all current records")) {
-                            startnew(AskForAllPlayerStates);
+                     if (UI::Button("Copy to clipboard")) {
+                            //startnew(AskForAllPlayerStates);
+							startnew(getCSV);
                         }
                   
             }
