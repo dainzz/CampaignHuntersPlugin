@@ -15,10 +15,10 @@ void Main() {
 }
 
 void InitCoro() {   
+	Log("Starting InitCoro");
     MLHook::RegisterMLHook(playerFinishedHook, PageUID + "_NewRecord");
     MLHook::RegisterMLHook(mapChangeHook, PageUID + "_MapChange");
 	MLHook::RegisterMLHook(csvHook, PageUID + "_CSVRecords");
-	
 	
     sleep(50);
     yield();
@@ -27,12 +27,26 @@ void InitCoro() {
     MLHook::InjectManialinkToPlayground(PageUID, manialinkScript, true);
     yield();
     yield();
-	auto pg = get_cp();   	
-	while(pg == null)
+	
+	while(get_cp() == null)
 	{
-		yield();
+		Log("Waiting for playground...");
+		sleep(1000);
+		yield();	
+	}	
+		
+	auto pg = get_cp();   
+		
+	
+	while(pg.Arena.Rules.RulesStateEndTime == 4294967295){
+			Log("Waiting for round to start...");
+			sleep(1000);
+			yield();
 	}
-    if(pg.Arena.Rules.RulesStateEndTime  != 4294967295) roundStarted = true;
+	
+	roundStarted = true;	
+	
+	Log("Starting MainCoro");
     startnew(CoroutineFunc(playerFinishedHook.MainCoro));
 }
 
