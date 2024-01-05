@@ -325,6 +325,7 @@ void DrawUI() {
                             //startnew(AskForAllPlayerStates);
 							startnew(getCSV);
                         }
+					UI::Text("Round started: " + roundStarted);
                   
             }
             UI::EndChild();

@@ -68,11 +68,12 @@ Void CSVSend() {
         if (Player.Score == Null) continue;
         if(Player.Score.BestRaceTimes.count == 0) continue;
         declare Name = Player.User.Name;
+		declare UId = "" ^ Player.User.WebServicesUserId;
         declare Timestamp = TimeLib::GetCurrent();
         declare BestTimes = "" ^ Player.Score.BestRaceTimes[Player.Score.BestRaceTimes.count - 1];
 	    declare MapId = Map.MapInfo.MapUid;  
 
-        temp = temp ^ Name ^ ";" ^ BestTimes ^ "\n"; 
+        temp = temp ^ UId ^ ";" ^ Name ^ ";" ^ MapId ^ ";" ^ BestTimes ^ ";" ^ "0\n"; 
     }
     SendCustomEvent("MLHook_Event_" ^ C_PageUID ^ "_CSVRecords", [temp]);
     MLHookLog("Completed: CSVSend");
