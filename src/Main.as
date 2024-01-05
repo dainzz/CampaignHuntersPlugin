@@ -35,15 +35,12 @@ void InitCoro() {
 		yield();	
 	}	
 		
-	auto pg = get_cp();   
-		
-	
-	while(pg.Arena.Rules.RulesStateEndTime == 4294967295){
+	while(getEndTime() == 4294967295)
+	{
 			Log("Waiting for round to start...");
 			sleep(1000);
 			yield();
 	}
-	
 	roundStarted = true;	
 	
 	Log("Starting MainCoro");
@@ -57,6 +54,12 @@ void _Unload() {
     MLHook::UnregisterMLHooksAndRemoveInjectedML();
         MLHook::RemoveInjectedMLFromPlayground(PageUID);
 } 
+
+int getEndTime(){
+	auto pg = get_cp();   
+	if(pg == null) return 4294967295;
+	return pg.Arena.Rules.RulesStateEndTime;
+}
 
 string get_CurrentMap() {
     auto map = GetApp().RootMap;
@@ -204,7 +207,10 @@ void SendToAPI() {
         Log("Adding record to json: " + name + ", " + id + ", " + Time::Format(time) + ", " + Time::FormatString("%H:%M:%S", Text::ParseInt64(timestamp)));
         jsonData.Add(record);              
     }
-                string data = Json::Write(jsonData);
+	
+	bool succ = false;
+	while(succ == false){
+	 string data = Json::Write(jsonData);
                 auto req = Net::HttpRequest();
                 req.Method = Net::HttpMethod::Post;
                 req.Url = S_Host + "/api/records";
@@ -218,12 +224,18 @@ void SendToAPI() {
             yield();
             sleep(50);
             } 
+			
 			if (req.ResponseCode() != 200) {
-                error("API Error, failed to upload records. HTTP Error " + req.ResponseCode());               
+                error("API Error, failed to upload records. HTTP Error " + req.ResponseCode());  
+				sleep(5000);
                 }
             else{
                 Log("Sync with server successful.");
+				succ = true;
             }
+	}     
+		
+			
             pendingEvents.RemoveRange(0, toProcess); //TODO: keep entries that returned api error
 
             }
@@ -250,7 +262,7 @@ void NotifyMissingPermissions() {
 
 string g_APIToken;
 uint lastPbUpdate = 0;
-bool enabled = false;
+bool enabled = true;
 
  
 string getToken(){
